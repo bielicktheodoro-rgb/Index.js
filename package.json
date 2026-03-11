@@ -1,0 +1,10 @@
+{
+"name": "limax-bot",
+"version": "1.0.0",
+"main": "index.js",
+"type": "commonjs",
+"dependencies": {
+"@whiskeysockets/baileys": "^6.7.5",
+"pino": "^8.17.0"
+}
+}
