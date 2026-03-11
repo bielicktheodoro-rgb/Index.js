@@ -14,8 +14,8 @@ const fs = require("fs")
 process.on("uncaughtException", err => console.log(err))
 process.on("unhandledRejection", err => console.log(err))
 
-const adminNumber = "55429496858@s.whatsapp.net"
-const botNumber = "55429496858"
+const adminNumber = "554299496858@s.whatsapp.net"
+const botNumber = "554299496858"
 
 const messageLog = new Map()
 const MAX_MESSAGES = 500
