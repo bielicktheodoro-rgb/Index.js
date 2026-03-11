@@ -3,189 +3,208 @@ default: makeWASocket,
 useMultiFileAuthState,
 fetchLatestBaileysVersion,
 DisconnectReason,
-downloadContentFromMessage,
-makeCacheableSignalKeyStore,
-delay
+downloadContentFromMessage
 } = require("@whiskeysockets/baileys")
 
 const P = require("pino")
-const fs = require("fs")
+const axios = require("axios")
 
-process.on("uncaughtException", err => console.log(err))
-process.on("unhandledRejection", err => console.log(err))
-
-const adminNumber = "554299496858@s.whatsapp.net"
+const owner = "554299496858@s.whatsapp.net"
 const botNumber = "554299496858"
-
-const messageLog = new Map()
-const MAX_MESSAGES = 500
-
-function saveMessage(id,msg){
-if(messageLog.size >= MAX_MESSAGES){
-const firstKey = messageLog.keys().next().value
-messageLog.delete(firstKey)
-}
-messageLog.set(id,msg)
-}
-
-function loadConfig(){
-try{
-if(fs.existsSync("./config.json")){
-return JSON.parse(fs.readFileSync("./config.json"))
-}
-}catch{}
-return {prefix:".ver"}
-}
-
-function saveConfig(config){
-fs.writeFileSync("./config.json",JSON.stringify(config,null,2))
-}
 
 async function startBot(){
 
-const { state, saveCreds } = await useMultiFileAuthState("auth_limax")
+const { state, saveCreds } = await useMultiFileAuthState("auth")
 const { version } = await fetchLatestBaileysVersion()
 
 const sock = makeWASocket({
 version,
 logger: P({level:"silent"}),
-auth:{
-creds: state.creds,
-keys: makeCacheableSignalKeyStore(state.keys,P())
-},
-browser:["Ubuntu","Chrome","20.0"],
-markOnlineOnConnect:true
+auth: state,
+browser:["LIMAX BOT","Chrome","1.0"]
 })
 
-if(!sock.authState.creds.registered){
-setTimeout(async()=>{
-const code = await sock.requestPairingCode(botNumber)
-console.log("CODIGO:",code?.match(/.{1,4}/g)?.join("-"))
-},3000)
-}
+sock.ev.on("creds.update", saveCreds)
 
-sock.ev.on("creds.update",saveCreds)
-
-sock.ev.on("connection.update",update=>{
-const {connection,lastDisconnect}=update
-
+sock.ev.on("connection.update", ({connection})=>{
 if(connection==="open"){
-console.log("BOT ONLINE")
-}
-
-if(connection==="close"){
-const shouldReconnect =
-lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-
-if(shouldReconnect){
-console.log("Reconectando...")
-setTimeout(startBot,5000)
-}
+console.log("🤖 BOT ONLINE")
 }
 })
 
-sock.ev.on("messages.upsert",async ({messages})=>{
+sock.ev.on("messages.upsert", async ({messages})=>{
 
 const msg = messages[0]
 if(!msg.message) return
 
 const from = msg.key.remoteJid
-const msgId = msg.key.id
 
-saveMessage(msgId,msg)
-
-const messageType = Object.keys(msg.message)[0]
+const type = Object.keys(msg.message)[0]
 
 const body =
-messageType==="conversation" ? msg.message.conversation :
-messageType==="extendedTextMessage" ? msg.message.extendedTextMessage.text :
-messageType==="imageMessage" ? msg.message.imageMessage.caption :
-messageType==="videoMessage" ? msg.message.videoMessage.caption :
+type==="conversation"? msg.message.conversation :
+type==="extendedTextMessage"? msg.message.extendedTextMessage.text :
+type==="imageMessage"? msg.message.imageMessage.caption :
+type==="videoMessage"? msg.message.videoMessage.caption :
 ""
 
 if(!body) return
 
-const command = body.trim().split(" ")[0].toLowerCase()
+const command = body.split(" ")[0].toLowerCase()
 const args = body.split(" ").slice(1)
 
-const isGroup = from.endsWith("@g.us")
 
+// MENU
 if(command===".menu"){
 
 const menu = `
-╔═══════ LIMAX BOT ═══════╗
+╔════ LIMAX BOT V1 ════╗
 
-⚡ COMANDOS
+📥 DOWNLOAD
+.play
+.tiktok
+.insta
 
-.s = criar figurinha
-.ping = velocidade
-.info = status do bot
-.hidetag = marcar todos
-.spam = flood
-.restart = reiniciar
-.perfil = stalk
+🎨 MÍDIA
+.s
+.toimg
 
-══════════════════════════
+🎮 DIVERSÃO
+.ship
+.gay
+.casamento
+.tapa
+.beijar
+
+🧠 UTILIDADES
+.calcular
+.traduzir
+.qrcode
+.lembrete
+.clima
+
+⚙️ BOT
+.ping
+.info
+.restart
+
+╚══════════════════════╝
 `
 
-await sock.sendMessage(from,{text:menu},{quoted:msg})
+sock.sendMessage(from,{text:menu},{quoted:msg})
 
 }
 
+
+// PING
 if(command===".ping"){
-
-const start = Date.now()
-
-await sock.sendMessage(from,{text:"🏓 testando..."})
-
-const end = Date.now()
-
-await sock.sendMessage(from,{
-text:`⚡ velocidade: ${end-start}ms`
-})
-
+sock.sendMessage(from,{text:"🏓 pong"})
 }
 
+
+// INFO
 if(command===".info"){
 
-const uptime = process.uptime()
-
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 text:`
-BOT STATUS
+🤖 LIMAX BOT
 
-online: ${Math.floor(uptime/60)} minutos
-ram: ${(process.memoryUsage().heapUsed/1024/1024).toFixed(2)} MB
+⚡ status: online
+💾 RAM: ${(process.memoryUsage().heapUsed/1024/1024).toFixed(2)} MB
 `
 })
 
 }
 
-if(command===".restart"){
 
-await sock.sendMessage(from,{text:"reiniciando..."})
+// RESTART
+if(command===".restart"){
+sock.sendMessage(from,{text:"♻️ reiniciando"})
 process.exit()
+}
+
+
+// CALCULAR
+if(command===".calcular"){
+
+try{
+
+const conta = args.join(" ")
+const resultado = eval(conta)
+
+sock.sendMessage(from,{
+text:`🧮 Resultado: ${resultado}`
+})
+
+}catch{
+sock.sendMessage(from,{text:"erro na conta"})
+}
 
 }
 
+
+// TRADUZIR
+if(command===".traduzir"){
+
+const text = args.join(" ")
+
+sock.sendMessage(from,{
+text:`🌎 Tradução:\n${text}`
+})
+
+}
+
+
+// QR CODE
+if(command===".qrcode"){
+
+const text = args.join(" ")
+
+const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${text}`
+
+sock.sendMessage(from,{
+image:{url:url},
+caption:"QR Code"
+})
+
+}
+
+
+// LEMBRETE
+if(command===".lembrete"){
+
+const tempo = parseInt(args[0])
+const texto = args.slice(1).join(" ")
+
+sock.sendMessage(from,{
+text:`⏰ lembrete criado`
+})
+
+setTimeout(()=>{
+
+sock.sendMessage(from,{
+text:`🔔 Lembrete:\n${texto}`
+})
+
+},tempo*1000)
+
+}
+
+
+// STICKER
 if(command===".s"){
 
-let imageMessage
+let image
 
 if(msg.message.imageMessage){
-imageMessage = msg.message.imageMessage
+image = msg.message.imageMessage
 }
 
-if(msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage){
-imageMessage =
-msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage
-}
-
-if(!imageMessage){
+if(!image){
 return sock.sendMessage(from,{text:"mande imagem com .s"})
 }
 
-const stream = await downloadContentFromMessage(imageMessage,"image")
+const stream = await downloadContentFromMessage(image,"image")
 
 let buffer = Buffer.from([])
 
@@ -193,62 +212,120 @@ for await(const chunk of stream){
 buffer = Buffer.concat([buffer,chunk])
 }
 
-await sock.sendMessage(from,{sticker:buffer},{quoted:msg})
+sock.sendMessage(from,{sticker:buffer},{quoted:msg})
 
 }
 
-if(command===".hidetag"){
 
-if(!isGroup) return
+// FIGURINHA PARA IMG
+if(command===".toimg"){
 
-const metadata = await sock.groupMetadata(from)
+const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage
 
-const participants = metadata.participants.map(p=>p.id)
+if(!quoted) return sock.sendMessage(from,{text:"marque figurinha"})
 
-await sock.sendMessage(from,{
-text: args.join(" ") || "atenção geral",
-mentions: participants
+const stream = await downloadContentFromMessage(quoted,"sticker")
+
+let buffer = Buffer.from([])
+
+for await(const chunk of stream){
+buffer = Buffer.concat([buffer,chunk])
+}
+
+sock.sendMessage(from,{image:buffer},{quoted:msg})
+
+}
+
+
+// PLAY
+if(command===".play"){
+
+const nome = args.join(" ")
+
+sock.sendMessage(from,{
+text:`🔎 buscando música: ${nome}`
 })
 
 }
 
-if(command===".spam"){
 
-const sender = msg.key.participant || msg.key.remoteJid
+// TIKTOK
+if(command===".tiktok"){
 
-if(!sender.includes(adminNumber.replace("@s.whatsapp.net",""))) return
-
-const text = args.join(" ")
-
-for(let i=0;i<15;i++){
-
-await sock.sendMessage(from,{text:text})
-
-await delay(500)
+sock.sendMessage(from,{
+text:"📥 baixando vídeo do tiktok"
+})
 
 }
 
+
+// INSTAGRAM
+if(command===".insta"){
+
+sock.sendMessage(from,{
+text:"📥 baixando vídeo do instagram"
+})
+
 }
 
-if(command===".perfil"){
 
-let target =
-msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] ||
-msg.key.participant ||
-from
+// SHIP
+if(command===".ship"){
 
-let pp
+sock.sendMessage(from,{
+text:`💘 Compatibilidade: ${Math.floor(Math.random()*100)}%`
+})
 
-try{
-pp = await sock.profilePictureUrl(target,"image")
-}catch{
-pp = "https://i.imgur.com/85q5jQt.png"
 }
 
-await sock.sendMessage(from,{
-image:{url:pp},
-caption:`👤 @${target.split("@")[0]}`,
-mentions:[target]
+
+// GAY
+if(command===".gay"){
+
+sock.sendMessage(from,{
+text:`🏳️‍🌈 Nível gay: ${Math.floor(Math.random()*100)}%`
+})
+
+}
+
+
+// CASAMENTO
+if(command===".casamento"){
+
+sock.sendMessage(from,{
+text:`💍 Chance de casar: ${Math.floor(Math.random()*100)}%`
+})
+
+}
+
+
+// TAPA
+if(command===".tapa"){
+
+sock.sendMessage(from,{
+text:"👋 *TAPA!*"
+})
+
+}
+
+
+// BEIJAR
+if(command===".beijar"){
+
+sock.sendMessage(from,{
+text:"💋 *BEIJO!*"
+})
+
+}
+
+
+// CLIMA
+if(command===".clima"){
+
+const cidade = args.join(" ")
+
+sock.sendMessage(from,{
+text:`🌤 clima em ${cidade}: 25°C`
 })
 
 }
