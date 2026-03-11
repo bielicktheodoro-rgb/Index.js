@@ -7,7 +7,22 @@ downloadContentFromMessage
 } = require("@whiskeysockets/baileys")
 
 const P = require("pino")
-const axios = require("axios")
+const fs = require("fs")
+
+const ytdl = require("ytdl-core")
+const yts = require("yt-search")
+
+const { Tiktok } = require("tiktokdl-core")
+
+const OpenAI = require("openai")
+
+const openai = new OpenAI({
+apiKey: "SUA_API_KEY_AQUI"
+})
+
+const adminNumber = "SEUNUMERO@s.whatsapp.net"
+
+const messageLog = new Map()
 
 async function startBot(){
 
@@ -17,24 +32,186 @@ const { version } = await fetchLatestBaileysVersion()
 const sock = makeWASocket({
 version,
 logger: P({ level: "silent" }),
-auth: state,
-browser:["LIMAX BOT","Chrome","1.0"]
+auth: state
 })
 
 sock.ev.on("creds.update", saveCreds)
 
-if (!sock.authState.creds.registered) {
+sock.ev.on("connection.update",(update)=>{
 
-const numero = "554299496858"
+const { connection,lastDisconnect } = update
 
-setTimeout(async () => {
+if(connection==="open"){
+console.log("BOT ONLINE")
+}
 
-const code = await sock.requestPairingCode(numero)
+if(connection==="close"){
+const shouldReconnect =
+lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
 
-console.log("==============")
-console.log("CÓDIGO WHATSAPP:")
-console.log(code)
-console.log("==============")
+if(shouldReconnect) startBot()
+}
+
+})
+
+sock.ev.on("messages.upsert",async({messages})=>{
+
+const msg = messages[0]
+if(!msg.message) return
+
+const from = msg.key.remoteJid
+const msgId = msg.key.id
+
+const sender = msg.key.participant || msg.key.remoteJid
+
+// salva mensagem
+messageLog.set(msgId,msg)
+
+setTimeout(()=>{
+messageLog.delete(msgId)
+},120000)
+
+
+// -----------------------------
+// ANTI DELETE
+// -----------------------------
+
+const isProtocol = msg.message.protocolMessage
+
+if(isProtocol){
+
+const deletedId = msg.message.protocolMessage.key.id
+
+if(messageLog.has(deletedId)){
+
+const deletedMsg = messageLog.get(deletedId)
+
+await sock.sendMessage(adminNumber,{
+text:`🚫 MENSAGEM APAGADA
+
+👤 ${sender}
+`
+})
+
+await sock.sendMessage(adminNumber,{
+forward:deletedMsg
+})
+
+}
+
+return
+}
+
+
+// -----------------------------
+// pegar texto
+// -----------------------------
+
+const type = Object.keys(msg.message)[0]
+
+let body = ""
+
+if(type==="conversation") body = msg.message.conversation
+if(type==="extendedTextMessage") body = msg.message.extendedTextMessage.text
+
+if(!body) return
+
+const command = body.split(" ")[0].toLowerCase()
+const args = body.split(" ").slice(1)
+
+
+// -----------------------------
+// TESTE
+// -----------------------------
+
+if(command===".teste"){
+
+await sock.sendMessage(from,{
+text:"✅ Bot funcionando"
+},{quoted:msg})
+
+}
+
+
+// -----------------------------
+// TIKTOK
+// -----------------------------
+
+if(command===".tiktok"){
+
+const url = args[0]
+
+if(!url) return sock.sendMessage(from,{text:"Envie o link"})
+
+try{
+
+const data = await Tiktok(url)
+
+await sock.sendMessage(from,{
+video:{ url:data.video.noWatermark },
+caption:"🎵 TikTok baixado"
+},{quoted:msg})
+
+}catch{
+
+sock.sendMessage(from,{text:"Erro ao baixar"})
+}
+
+}
+
+
+// -----------------------------
+// YOUTUBE MUSIC
+// -----------------------------
+
+if(command===".play"){
+
+const query = args.join(" ")
+
+if(!query) return sock.sendMessage(from,{text:"Digite o nome da música"})
+
+const search = await yts(query)
+
+const video = search.videos[0]
+
+const stream = ytdl(video.url,{filter:"audioonly"})
+
+await sock.sendMessage(from,{
+audio:stream,
+mimetype:"audio/mpeg"
+},{quoted:msg})
+
+}
+
+
+// -----------------------------
+// IA
+// -----------------------------
+
+if(command===".ia"){
+
+const pergunta = args.join(" ")
+
+if(!pergunta) return
+
+const response = await openai.chat.completions.create({
+model:"gpt-4o-mini",
+messages:[
+{role:"user",content:pergunta}
+]
+})
+
+const reply = response.choices[0].message.content
+
+await sock.sendMessage(from,{text:reply},{quoted:msg})
+
+}
+
+})
+
+}
+
+startBot()console.log("==============")
 
 }, 3000)
 
