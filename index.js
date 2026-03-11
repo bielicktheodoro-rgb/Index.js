@@ -15,8 +15,8 @@ const fs = require("fs");
 // ⚙️ CONFIGURAÇÕES DO LIMAX BOT
 // =======================================================
 
-const adminNumber = "55429496858@s.whatsapp.net";
-const botNumber = "55429496858";
+const adminNumber = "554299496858@s.whatsapp.net";
+const botNumber = "554299496858";
 const usePairingCode = true;
 
 // [RAFAX SYSTEM] MEMÓRIA RAM PARA O ANTI-DELETE
