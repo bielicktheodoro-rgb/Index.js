@@ -18,7 +18,7 @@ const admins = [
 "5542999010537@s.whatsapp.net"
 ];
 
-const botNumber = "55429496858";
+const botNumber = "5542999496858";
 const usePairingCode = true;
 
 const messageLog = new Map();
