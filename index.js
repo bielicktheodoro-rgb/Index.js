@@ -14,8 +14,8 @@ const fs = require("fs");
 // ================= CONFIG =================
 
 const admins = [
-"55429496858@s.whatsapp.net",
-"55429010537@s.whatsapp.net"
+"5542999496858@s.whatsapp.net",
+"5542999010537@s.whatsapp.net"
 ];
 
 const botNumber = "55429496858";
