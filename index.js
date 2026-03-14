@@ -11,13 +11,11 @@ delay
 const P = require("pino");
 const fs = require("fs");
 
-// =======================================================
-// ⚙️ CONFIGURAÇÕES DO LIMAX BOT
-// =======================================================
+// ================= CONFIG =================
 
 const admins = [
 "55429496858@s.whatsapp.net",
-"554299010537@s.whatsapp.net"
+"55429010537@s.whatsapp.net"
 ];
 
 const botNumber = "55429496858";
@@ -29,9 +27,7 @@ function isAdmin(sender){
 return admins.includes(sender);
 }
 
-// =======================================================
-// PREFIXO
-// =======================================================
+// ================= PREFIXO =================
 
 function loadConfig(){
 try{
@@ -39,14 +35,14 @@ if(fs.existsSync("./config.json")){
 return JSON.parse(fs.readFileSync("./config.json"));
 }
 }catch{}
-return { prefix: ".ver" };
+return {prefix:"."}
 }
 
 function saveConfig(config){
-fs.writeFileSync("./config.json", JSON.stringify(config,null,2));
+fs.writeFileSync("./config.json",JSON.stringify(config,null,2));
 }
 
-// =======================================================
+// ================= BOT =================
 
 async function startBot(){
 
@@ -61,19 +57,32 @@ auth:{
 creds: state.creds,
 keys: makeCacheableSignalKeyStore(state.keys,P({level:"fatal"}))
 },
-browser:["Ubuntu","Chrome","20.0.04"],
+browser:["Limax","Chrome","1.0"],
 markOnlineOnConnect:true
 });
 
-// pairing
+// ===== PAIRING CODE =====
 
-if(usePairingCode && !sock.authState.creds.registered){
+if(usePairingCode && !state.creds.registered){
 
 setTimeout(async()=>{
+
+try{
+
+console.log("Gerando código...");
+
 const code = await sock.requestPairingCode(botNumber);
 
-console.log("\n🔑 CODIGO:");
+console.log("\n====================");
+console.log("CODIGO:");
 console.log(code.match(/.{1,4}/g).join("-"));
+console.log("====================\n");
+
+}catch(e){
+
+console.log("Erro no código:",e)
+
+}
 
 },3000)
 
@@ -81,9 +90,9 @@ console.log(code.match(/.{1,4}/g).join("-"));
 
 sock.ev.on("creds.update", saveCreds);
 
-// conexão
+// ===== CONEXÃO =====
 
-sock.ev.on("connection.update", async(update)=>{
+sock.ev.on("connection.update",(update)=>{
 
 const {connection,lastDisconnect} = update;
 
@@ -92,7 +101,9 @@ if(connection==="open"){
 console.log("BOT ONLINE");
 
 for(let adm of admins){
-await sock.sendMessage(adm,{text:"✅ LIMAX BOT ONLINE"});
+
+sock.sendMessage(adm,{text:"✅ LIMAX BOT ONLINE"})
+
 }
 
 }
@@ -102,16 +113,16 @@ if(connection==="close"){
 const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
 
 if(shouldReconnect){
-startBot();
+
+startBot()
+
 }
 
 }
 
 });
 
-// =======================================================
-// MENSAGENS
-// =======================================================
+// ===== MENSAGENS =====
 
 sock.ev.on("messages.upsert", async({messages})=>{
 
@@ -119,27 +130,24 @@ const msg = messages[0];
 if(!msg.message) return;
 
 const from = msg.key.remoteJid;
-const msgId = msg.key.id;
+const sender = msg.key.participant || msg.key.remoteJid;
+const isGroup = from.endsWith("@g.us");
 
-// =======================================================
-// ANTI DELETE
-// =======================================================
+// ===== ANTI DELETE =====
 
 const isProtocol = msg.message.protocolMessage && msg.message.protocolMessage.type===0;
 
 if(isProtocol){
 
-const deletedKeyId = msg.message.protocolMessage.key.id;
+const deletedId = msg.message.protocolMessage.key.id;
 
-if(messageLog.has(deletedKeyId)){
+if(messageLog.has(deletedId)){
 
-const deletedMsg = messageLog.get(deletedKeyId);
+const deletedMsg = messageLog.get(deletedId);
 
 for(let adm of admins){
 
-await sock.sendMessage(adm,{
-forward: deletedMsg
-})
+await sock.sendMessage(adm,{forward:deletedMsg})
 
 }
 
@@ -149,46 +157,37 @@ return;
 
 }
 
-messageLog.set(msgId,msg);
+messageLog.set(msg.key.id,msg);
 
 setTimeout(()=>{
 
-messageLog.delete(msgId)
+messageLog.delete(msg.key.id)
 
 },120000);
 
-// =======================================================
-// TEXTO
-// =======================================================
+// ===== TEXTO =====
 
-const messageType = Object.keys(msg.message)[0];
+const type = Object.keys(msg.message)[0];
 
 const body =
-messageType==="conversation" ? msg.message.conversation :
-messageType==="extendedTextMessage" ? msg.message.extendedTextMessage.text :
-messageType==="imageMessage" ? msg.message.imageMessage.caption :
-messageType==="videoMessage" ? msg.message.videoMessage.caption :
+type==="conversation" ? msg.message.conversation :
+type==="extendedTextMessage" ? msg.message.extendedTextMessage.text :
+type==="imageMessage" ? msg.message.imageMessage.caption :
+type==="videoMessage" ? msg.message.videoMessage.caption :
 "";
 
 if(!body) return;
 
-const command = body.trim().split(" ")[0].toLowerCase();
-const args = body.trim().split(" ").slice(1);
-const isGroup = from.endsWith("@g.us");
+const command = body.split(" ")[0].toLowerCase();
+const args = body.split(" ").slice(1);
 
-const sender = msg.key.participant || msg.key.remoteJid;
-
-// =======================================================
-// MENU
-// =======================================================
+// ===== MENU =====
 
 if(command === ".menu"){
 
 const menu = `⚡ LIMAX BOT ⚡
 
-.comandos
-
-.s
+.s (sticker)
 .teste
 .perfil
 .hidetag
@@ -196,45 +195,45 @@ const menu = `⚡ LIMAX BOT ⚡
 .ban
 .promote
 .demote
+
+Donos: ${admins.length}
 `;
 
-await sock.sendMessage(from,{text:menu},{quoted:msg});
+sock.sendMessage(from,{text:menu},{quoted:msg});
 
 }
 
-// =======================================================
-// TESTE
-// =======================================================
+// ===== TESTE =====
 
 if(command === ".teste"){
 
-await sock.sendMessage(from,{text:"✅ BOT FUNCIONANDO"},{quoted:msg})
+sock.sendMessage(from,{text:"✅ BOT FUNCIONANDO"},{quoted:msg})
 
 }
 
-// =======================================================
-// STICKER
-// =======================================================
+// ===== STICKER =====
 
 if(command === ".s"){
 
-let imageMessage;
+let image;
 
 if(msg.message.imageMessage){
-imageMessage = msg.message.imageMessage;
+image = msg.message.imageMessage;
 }
 
 else if(msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage){
 
-imageMessage = msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
+image = msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
 
 }
 
-if(!imageMessage){
+if(!image){
+
 return sock.sendMessage(from,{text:"❌ marque uma imagem"})
+
 }
 
-const stream = await downloadContentFromMessage(imageMessage,"image");
+const stream = await downloadContentFromMessage(image,"image");
 
 let buffer = Buffer.from([]);
 
@@ -244,13 +243,11 @@ buffer = Buffer.concat([buffer,chunk])
 
 }
 
-await sock.sendMessage(from,{sticker:buffer},{quoted:msg})
+sock.sendMessage(from,{sticker:buffer},{quoted:msg})
 
 }
 
-// =======================================================
-// HIDETAG
-// =======================================================
+// ===== HIDETAG =====
 
 if(command === ".hidetag"){
 
@@ -260,16 +257,14 @@ const group = await sock.groupMetadata(from);
 
 const members = group.participants.map(p=>p.id);
 
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 text: args.join(" ") || "📢 ATENÇÃO",
 mentions: members
 })
 
 }
 
-// =======================================================
-// SPAM
-// =======================================================
+// ===== SPAM =====
 
 if(command === ".spam"){
 
@@ -287,9 +282,7 @@ await delay(400)
 
 }
 
-// =======================================================
-// ADM
-// =======================================================
+// ===== ADM =====
 
 if((command === ".ban" || command === ".promote" || command === ".demote") && isGroup){
 
@@ -297,7 +290,11 @@ if(!isAdmin(sender)) return;
 
 const target = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
 
-if(!target) return sock.sendMessage(from,{text:"marque alguém"});
+if(!target){
+
+return sock.sendMessage(from,{text:"marque alguém"})
+
+}
 
 const action =
 command === ".ban" ? "remove" :
@@ -308,9 +305,7 @@ await sock.groupParticipantsUpdate(from,[target],action);
 
 }
 
-// =======================================================
-// PERFIL
-// =======================================================
+// ===== PERFIL =====
 
 if(command === ".perfil"){
 
@@ -331,11 +326,11 @@ try{
 bio = (await sock.fetchStatus(target)).status
 }catch{}
 
-await sock.sendMessage(from,{
+sock.sendMessage(from,{
 image:{url:pp},
 caption:`👤 @${target.split("@")[0]}
 
-bio: ${bio}`,
+Bio: ${bio}`,
 mentions:[target]
 })
 
