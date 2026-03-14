@@ -16,11 +16,11 @@ const fs = require("fs");
 // =======================================================
 
 const admins = [
-"5542999496858@s.whatsapp.net",
-"5542999010537@s.whatsapp.net"
+"55429496858@s.whatsapp.net",
+"554299010537@s.whatsapp.net"
 ];
 
-const botNumber = "SEU_NUMERO_AQUI";
+const botNumber = "55429496858";
 const usePairingCode = true;
 
 const messageLog = new Map();
